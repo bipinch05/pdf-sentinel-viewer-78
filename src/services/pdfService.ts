@@ -1,40 +1,23 @@
-
 /**
  * Service to handle PDF streaming and security
  */
 
-// The provided PDF link for our demo
-const DEMO_PDF_URL = "https://morth.nic.in/sites/default/files/dd12-13_0.pdf";
+// The provided PDF link for our demo - using a public PDF that's CORS-friendly
+const DEMO_PDF_URL = "https://mozilla.github.io/pdf.js/web/compressed.tracemonkey-pldi-09.pdf";
 
 /**
  * Stream the demo PDF as a blob
  */
 export const streamPDF = async (): Promise<Blob> => {
   try {
-    // Using a CORS proxy would be better in a real implementation
-    // For demo purposes, we'll try to fetch the PDF directly
-    const proxyUrl = `https://cors-anywhere.herokuapp.com/${DEMO_PDF_URL}`;
+    // Direct fetch from a CORS-friendly source
+    const response = await fetch(DEMO_PDF_URL);
     
-    try {
-      // First try with CORS proxy
-      const response = await fetch(proxyUrl);
-      
-      if (response.ok) {
-        return await response.blob();
-      }
-      throw new Error('Failed to fetch with proxy');
-    } catch (proxyError) {
-      console.log('Proxy fetch failed, trying direct fetch');
-      
-      // If proxy fails, try direct fetch (may fail due to CORS)
-      const directResponse = await fetch(DEMO_PDF_URL);
-      
-      if (!directResponse.ok) {
-        throw new Error('Failed to fetch PDF directly');
-      }
-      
-      return await directResponse.blob();
+    if (!response.ok) {
+      throw new Error(`Failed to fetch PDF: ${response.status} ${response.statusText}`);
     }
+    
+    return await response.blob();
   } catch (error) {
     console.error('Error fetching PDF:', error);
     // Return an empty blob on error
