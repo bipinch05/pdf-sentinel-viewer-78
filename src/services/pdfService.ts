@@ -43,6 +43,28 @@ export const streamPDF = async (): Promise<Blob> => {
 };
 
 /**
+ * Stream a specific page of the PDF
+ * For the demo, this just returns the whole PDF as we're not using PDF.js to split pages
+ */
+export const streamPDFPage = async (documentId: string, pageNumber: number): Promise<Blob> => {
+  console.log(`Streaming page ${pageNumber} of document ${documentId}`);
+  // In a real app, we would extract just the requested page
+  // For the demo, we'll return the whole PDF
+  return await streamPDF();
+};
+
+/**
+ * Get a thumbnail for a PDF page
+ * For the demo, this returns a placeholder image
+ */
+export const getPDFThumbnail = async (documentId: string, pageNumber: number): Promise<string> => {
+  console.log(`Getting thumbnail for page ${pageNumber} of document ${documentId}`);
+  // In a real app, we would generate thumbnails from the PDF
+  // For the demo, we'll return a placeholder
+  return `https://via.placeholder.com/100x140?text=Page+${pageNumber}`;
+};
+
+/**
  * Applies security measures to the PDF viewer
  */
 export const applySecurityMeasures = (): void => {
