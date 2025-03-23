@@ -1,107 +1,129 @@
 
 import React, { useState, useEffect } from 'react';
-import { getAvailablePDFs, PDFDocument } from '@/services/pdfService';
-import PDFViewer from '@/components/PDFViewer';
+import { streamPDF, applySecurityMeasures } from '@/services/pdfService';
 import LoadingState from '@/components/LoadingState';
-import { Card, CardContent } from '@/components/ui/card';
-import { Button } from '@/components/ui/button';
-import { ChevronRight } from 'lucide-react';
+import { RotateCw, ZoomIn, ZoomOut } from 'lucide-react';
+import { toast } from '@/components/ui/use-toast';
 
 const Index = () => {
-  const [documents, setDocuments] = useState<PDFDocument[]>([]);
-  const [selectedDocument, setSelectedDocument] = useState<PDFDocument | null>(null);
+  const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [zoom, setZoom] = useState<number>(1);
+  const [rotation, setRotation] = useState<number>(0);
 
   useEffect(() => {
-    const loadDocuments = async () => {
+    const loadPDF = async () => {
       try {
-        const pdfs = await getAvailablePDFs();
-        setDocuments(pdfs);
+        setLoading(true);
+        // Apply security measures
+        applySecurityMeasures();
+        
+        // Get the PDF blob
+        const blob = await streamPDF();
+        
+        // Create a URL from the blob
+        const url = URL.createObjectURL(blob);
+        setPdfUrl(url);
       } catch (error) {
-        console.error('Failed to load PDFs:', error);
+        console.error('Failed to load PDF:', error);
+        toast({
+          title: "Error",
+          description: "Failed to load PDF. Please try again.",
+          variant: "destructive",
+        });
       } finally {
         setLoading(false);
       }
     };
     
-    loadDocuments();
+    loadPDF();
+    
+    // Clean up the URL on unmount
+    return () => {
+      if (pdfUrl) {
+        URL.revokeObjectURL(pdfUrl);
+      }
+    };
   }, []);
+
+  const handleZoomIn = () => {
+    setZoom(prev => Math.min(prev + 0.1, 2));
+  };
+
+  const handleZoomOut = () => {
+    setZoom(prev => Math.max(prev - 0.1, 0.5));
+  };
+
+  const handleRotate = () => {
+    setRotation(prev => (prev + 90) % 360);
+  };
 
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
-        <LoadingState message="Loading available documents..." />
+        <LoadingState message="Loading PDF document..." />
       </div>
     );
   }
 
-  // Show document selection if no document is selected
-  if (!selectedDocument) {
+  if (!pdfUrl) {
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center py-10 px-4">
-        <div className="w-full max-w-4xl mx-auto">
-          <div className="text-center mb-10 animate-slide-down">
-            <h1 className="text-3xl font-bold mb-2">Secure PDF Viewer</h1>
-            <p className="text-muted-foreground">
-              Select a document to view in our secure PDF viewer
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 animate-fade-in">
-            {documents.map((doc, index) => (
-              <Card 
-                key={doc.id}
-                className="overflow-hidden hover:shadow-lg transition-shadow duration-300 cursor-pointer border border-border/50"
-                onClick={() => setSelectedDocument(doc)}
-                style={{
-                  animationDelay: `${index * 100}ms`
-                }}
-              >
-                <CardContent className="p-0">
-                  <div className="bg-muted p-4 flex justify-between items-center">
-                    <div>
-                      <h2 className="font-medium text-lg">{doc.title}</h2>
-                      <p className="text-sm text-muted-foreground">
-                        {doc.pageCount} {doc.pageCount === 1 ? 'page' : 'pages'}
-                      </p>
-                    </div>
-                    <Button variant="secondary" size="sm" className="rounded-full">
-                      <ChevronRight className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="p-4">
-                    <div className="h-32 bg-secondary/50 rounded flex items-center justify-center">
-                      <p className="text-muted-foreground text-sm">Preview not available</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-xl font-medium mb-2">PDF Not Available</h1>
+          <p className="text-muted-foreground">
+            The PDF could not be loaded. Please try again later.
+          </p>
         </div>
       </div>
     );
   }
 
-  // Show PDF viewer when a document is selected
   return (
-    <div className="min-h-screen bg-background">
-      <div className="relative w-full">
-        <div className="fixed top-4 left-4 z-50">
-          <Button 
-            variant="outline" 
-            onClick={() => setSelectedDocument(null)}
-            className="glassmorphism hover:bg-white/90"
-          >
-            Back to Documents
-          </Button>
+    <div className="min-h-screen bg-background pdf-container flex flex-col">
+      {/* Simple controls */}
+      <div className="p-4 flex justify-center gap-4 bg-background/80 backdrop-blur-sm fixed top-0 left-0 w-full z-10">
+        <button
+          onClick={handleZoomOut}
+          className="p-2 rounded-full bg-background hover:bg-muted transition"
+          aria-label="Zoom out"
+        >
+          <ZoomOut className="w-5 h-5" />
+        </button>
+        <span className="flex items-center px-2">
+          {Math.round(zoom * 100)}%
+        </span>
+        <button
+          onClick={handleZoomIn}
+          className="p-2 rounded-full bg-background hover:bg-muted transition"
+          aria-label="Zoom in"
+        >
+          <ZoomIn className="w-5 h-5" />
+        </button>
+        <button
+          onClick={handleRotate}
+          className="p-2 rounded-full bg-background hover:bg-muted transition"
+          aria-label="Rotate"
+        >
+          <RotateCw className="w-5 h-5" />
+        </button>
+      </div>
+
+      {/* PDF display */}
+      <div className="flex-1 flex items-center justify-center mt-16">
+        <div 
+          className="max-w-full max-h-full transition-all duration-300"
+          style={{
+            transform: `scale(${zoom}) rotate(${rotation}deg)`,
+          }}
+        >
+          <iframe 
+            src={`${pdfUrl}#toolbar=0&navpanes=0&scrollbar=0`}
+            className="w-screen h-screen border-none"
+            title="PDF Viewer"
+            sandbox="allow-scripts"
+          />
         </div>
-        
-        <PDFViewer 
-          documentId={selectedDocument.id}
-          title={selectedDocument.title}
-          pageCount={selectedDocument.pageCount}
-        />
       </div>
     </div>
   );
