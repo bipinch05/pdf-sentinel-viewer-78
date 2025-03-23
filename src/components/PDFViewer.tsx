@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { streamPDFPage, applySecurityMeasures } from '@/services/pdfService';
 import LoadingState from './LoadingState';
@@ -6,6 +5,7 @@ import PDFControls from './PDFControls';
 import PDFThumbnails from './PDFThumbnails';
 import { toast } from '@/components/ui/use-toast';
 import { ChevronUp, ChevronDown } from 'lucide-react';
+import { Progress } from '@/components/ui/progress';
 
 interface PDFViewerProps {
   documentId: string;
@@ -17,6 +17,7 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ documentId, title, pageCount }) =
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [pageBlobs, setPageBlobs] = useState<Map<number, string>>(new Map());
   const [loading, setLoading] = useState<boolean>(true);
+  const [loadingProgress, setLoadingProgress] = useState<number>(0);
   const [zoom, setZoom] = useState<number>(1);
   const [rotation, setRotation] = useState<number>(0);
   const [isFullscreen, setIsFullscreen] = useState<boolean>(false);
@@ -28,8 +29,17 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ documentId, title, pageCount }) =
     
     setCurrentPage(newPage);
     setLoading(true);
+    setLoadingProgress(0);
     
     try {
+      // Artificial progress indicator for demo purposes
+      const progressInterval = setInterval(() => {
+        setLoadingProgress(prev => {
+          const newProgress = prev + Math.random() * 15;
+          return newProgress >= 100 ? 100 : newProgress;
+        });
+      }, 200);
+      
       // Check if we already have this page cached
       if (!pageBlobs.has(newPage)) {
         const blob = await streamPDFPage(documentId, newPage);
@@ -46,6 +56,9 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ documentId, title, pageCount }) =
           setPageBlobs(prev => new Map(prev).set(page, url));
         });
       }
+      
+      clearInterval(progressInterval);
+      setLoadingProgress(100);
     } catch (error) {
       console.error('Error loading page:', error);
       toast({
@@ -164,7 +177,15 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ documentId, title, pageCount }) =
         }}
       >
         {loading ? (
-          <LoadingState message={`Loading page ${currentPage}...`} />
+          <div className="flex flex-col items-center">
+            <LoadingState message={`Loading page ${currentPage}...`} />
+            <div className="w-64 mt-4">
+              <Progress value={loadingProgress} className="h-2" />
+              <p className="text-xs text-center mt-1 text-muted-foreground">
+                {Math.round(loadingProgress)}%
+              </p>
+            </div>
+          </div>
         ) : (
           <img 
             src={pageBlobs.get(currentPage) || ''}
@@ -221,11 +242,24 @@ const PDFViewer: React.FC<PDFViewerProps> = ({ documentId, title, pageCount }) =
         isFullscreen={isFullscreen}
         onPreviousPage={() => changePage(currentPage - 1)}
         onNextPage={() => changePage(currentPage + 1)}
-        onZoomIn={handleZoomIn}
-        onZoomOut={handleZoomOut}
-        onRotate={handleRotate}
-        onToggleFullscreen={toggleFullscreen}
-        onSearch={handleSearch}
+        onZoomIn={() => setZoom(prev => Math.min(prev + 0.1, 2))}
+        onZoomOut={() => setZoom(prev => Math.max(prev - 0.1, 0.5))}
+        onRotate={() => setRotation(prev => (prev + 90) % 360)}
+        onToggleFullscreen={() => {
+          if (!document.fullscreenElement) {
+            containerRef.current?.requestFullscreen();
+            setIsFullscreen(true);
+          } else {
+            document.exitFullscreen();
+            setIsFullscreen(false);
+          }
+        }}
+        onSearch={() => {
+          toast({
+            title: "Search",
+            description: "Search functionality will be implemented in a future version.",
+          });
+        }}
       />
     </div>
   );
